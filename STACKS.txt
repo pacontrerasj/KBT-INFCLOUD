@@ -1,0 +1,43 @@
+SUBIR ARCHIVOS YAML: ls -l
+
+aws cloudformation create-stack \
+  --region us-east-1 \
+  --stack-name s3-technova \
+  --template-body file://s3-technova.yaml \
+  --parameters ParameterKey=BucketName,ParameterValue=nombre-de-tu-bucket
+
+aws s3 cp vpc-technova.yaml s3://nombre-de-tu-bucket/cloudformation/
+aws s3 cp rds-technova.yaml s3://nombre-de-tu-bucket/cloudformation/
+aws s3 ls s3://nombre-de-tu-bucket/cloudformation/
+
+aws cloudformation create-stack \
+  --region us-east-1 \
+  --stack-name vpc-technova \
+  --template-url https://s3.amazonaws.com/nombre-de-tu-bucket/cloudformation/vpc-technova.yaml
+
+aws cloudformation create-stack \
+  --region us-east-1 \
+  --stack-name sg-technova \
+  --template-url https://s3.amazonaws.com/nombre-de-tu-bucket/cloudformation/sg-technova.yaml \
+  --parameters \
+    ParameterKey=VpcId,ParameterValue=vpc-XXXXXXXX \
+    ParameterKey=MiIP,ParameterValue=200.10.20.30/32
+
+VER TU IP: curl -s https://checkip.amazonaws.com
+
+aws cloudformation create-stack \
+  --stack-name stack-rds-technova \
+  --template-body file://rds-technova.yaml \
+  --parameters \
+    ParameterKey=VpcId,ParameterValue=vpc-XXXXXXXX \
+    ParameterKey=SubnetPrivadaDatos1,ParameterValue=subnet-XXXXXXXX \
+    ParameterKey=SubnetPrivadaDatos2,ParameterValue=subnet-YYYYYYYY \
+    ParameterKey=RdsSecurityGroupId,ParameterValue=sg-XXXXXXXX
+
+aws cloudformation create-stack \
+  --region us-east-1 \
+  --stack-name ec2-technova \
+  --template-url https://s3.amazonaws.com/nombre-de-tu-bucket/cloudformation/ec2-technova.yaml \
+  --parameters \
+    ParameterKey=SubnetPublicaWebId,ParameterValue=subnet-XXXXXXXX \
+    ParameterKey=SgEc2Id,ParameterValue=sg-XXXXXXXX

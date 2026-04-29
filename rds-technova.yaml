@@ -1,0 +1,129 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  FASE 3 - RDS MySQL 8.4 para TechNova.
+  Crea el DB Subnet Group y la instancia RDS dentro de vpc-technova.
+
+# ──────────────────────────────────────────────
+# PARÁMETROS (puede sobreescribir desde la consola)
+# ──────────────────────────────────────────────
+Parameters:
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: ID de vpc-technova
+
+  SubnetPrivadaDatos1:
+    Type: AWS::EC2::Subnet::Id
+    Description: ID de subnet-privada-datos-1 (ej. us-east-1a)
+
+  SubnetPrivadaDatos2:
+    Type: AWS::EC2::Subnet::Id
+    Description: ID de subnet-privada-datos-2 (ej. us-east-1b)
+
+  RdsSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: ID del Security Group sg-rds-technova (ya existente)
+
+  DBMasterPassword:
+    Type: String
+    NoEcho: true
+    Default: Duoc.1234
+    Description: Contraseña del usuario admin de RDS
+    MinLength: 8
+
+# ──────────────────────────────────────────────
+# RECURSOS
+# ──────────────────────────────────────────────
+Resources:
+
+  # -------------------------------------------------
+  # 1. DB Subnet Group  (obligatorio antes que la instancia)
+  # -------------------------------------------------
+  SubnetGroupTechnova:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: subnet-group-technova
+      DBSubnetGroupDescription: Subnet group para RDS TechNova (subnets privadas de datos)
+      SubnetIds:
+        - !Ref SubnetPrivadaDatos1
+        - !Ref SubnetPrivadaDatos2
+      Tags:
+        - Key: Name
+          Value: subnet-group-technova
+        - Key: Proyecto
+          Value: TechNova
+
+  # -------------------------------------------------
+  # 2. Instancia RDS MySQL 8.4
+  # -------------------------------------------------
+  RDSTechnova:
+    Type: AWS::RDS::DBInstance
+    DependsOn: SubnetGroupTechnova
+    DeletionPolicy: Delete          # Para entornos de laboratorio; usa Snapshot en producción
+    Properties:
+      DBInstanceIdentifier: rds-technova
+
+      # Motor
+      Engine: mysql
+      EngineVersion: '8.4'          # MySQL 8.4.x (última minor la elige AWS)
+
+      # Template Free Tier
+      DBInstanceClass: db.t3.micro
+      LicenseModel: general-public-license
+
+      # Almacenamiento
+      StorageType: gp3
+      AllocatedStorage: '30'        # GB
+      StorageEncrypted: true        # Cifrado habilitado
+
+      # Credenciales
+      MasterUsername: admin
+      MasterUserPassword: !Ref DBMasterPassword
+
+      # Red
+      DBSubnetGroupName: !Ref SubnetGroupTechnova
+      VPCSecurityGroups:
+        - !Ref RdsSecurityGroupId
+      PubliclyAccessible: false     # Public access: No
+      AvailabilityZone: us-east-1a  # AZ fija
+
+      # Backup deshabilitado (acelera creación en Academy)
+      BackupRetentionPeriod: 0
+      CopyTagsToSnapshot: false
+
+      # Multi-AZ deshabilitado (free tier)
+      MultiAZ: false
+
+      # Monitoreo básico
+      MonitoringInterval: 0         # Enhanced Monitoring deshabilitado
+
+      Tags:
+        - Key: Name
+          Value: rds-technova
+        - Key: Proyecto
+          Value: TechNova
+
+# ──────────────────────────────────────────────
+# OUTPUTS
+# ──────────────────────────────────────────────
+Outputs:
+
+  RDSEndpoint:
+    Description: >
+      Endpoint de conexión RDS (disponible ~5-8 min después del deploy).
+      Cópialo para usarlo en tu aplicación.
+    Value: !GetAtt RDSTechnova.Endpoint.Address
+    Export:
+      Name: rds-technova-endpoint
+
+  RDSPort:
+    Description: Puerto MySQL
+    Value: !GetAtt RDSTechnova.Endpoint.Port
+    Export:
+      Name: rds-technova-port
+
+  SubnetGroupName:
+    Description: Nombre del DB Subnet Group creado
+    Value: !Ref SubnetGroupTechnova
+    Export:
+      Name: subnet-group-technova

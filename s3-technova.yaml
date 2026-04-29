@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  S3 Bucket repositorio de templates CloudFormation para TechNova.
+  Crea el bucket, desbloquea acceso público y aplica policy
+  restringida solo a la carpeta cloudformation/.
+
+# ──────────────────────────────────────────────
+# PARÁMETROS
+# ──────────────────────────────────────────────
+Parameters:
+
+  BucketName:
+    Type: String
+    Description: Nombre único global para el bucket S3 (ej. technova-cloudformation-templates)
+
+# ──────────────────────────────────────────────
+# RECURSOS
+# ──────────────────────────────────────────────
+Resources:
+
+  # -------------------------------------------------
+  # 1. Bucket S3
+  # -------------------------------------------------
+  S3BucketTechnova:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        IgnorePublicAcls: false
+        BlockPublicPolicy: false
+        RestrictPublicBuckets: false
+      Tags:
+        - Key: Name
+          Value: !Ref BucketName
+        - Key: Proyecto
+          Value: TechNova
+
+  # -------------------------------------------------
+  # 2. Bucket Policy (acceso público solo a cloudformation/)
+  # -------------------------------------------------
+  S3BucketPolicyTechnova:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3BucketTechnova
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PublicReadCloudFormationTemplates
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub arn:aws:s3:::${BucketName}/cloudformation/*
+
+# ──────────────────────────────────────────────
+# OUTPUTS
+# ──────────────────────────────────────────────
+Outputs:
+
+  BucketName:
+    Description: Nombre del bucket creado
+    Value: !Ref S3BucketTechnova
+    Export:
+      Name: s3-technova-bucket-name
+
+  BucketUrl:
+    Description: URL base para los templates en la carpeta cloudformation/
+    Value: !Sub https://s3.amazonaws.com/${BucketName}/cloudformation/
+    Export:
+      Name: s3-technova-cloudformation-url

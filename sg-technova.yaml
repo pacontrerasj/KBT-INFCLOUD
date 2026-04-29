@@ -1,0 +1,96 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  FASE 2 - Security Groups para TechNova.
+  Crea sg-ec2-technova y sg-rds-technova dentro de vpc-technova.
+
+# ──────────────────────────────────────────────
+# PARÁMETROS
+# ──────────────────────────────────────────────
+Parameters:
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: ID de vpc-technova
+
+  MiIP:
+    Type: String
+    Description: Tu IP pública en formato CIDR (ej. 200.10.20.30/32)
+
+# ──────────────────────────────────────────────
+# RECURSOS
+# ──────────────────────────────────────────────
+Resources:
+
+  # -------------------------------------------------
+  # 1. Security Group para EC2
+  # -------------------------------------------------
+  SgEc2Technova:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: sg-ec2-technova
+      Description: Security Group para instancias EC2 de TechNova
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - Description: SSH desde mi IP
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref MiIP
+        - Description: HTTP publico
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - Description: HTTPS publico
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - Description: Backend puerto 3001
+          IpProtocol: tcp
+          FromPort: 3001
+          ToPort: 3001
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: sg-ec2-technova
+        - Key: Proyecto
+          Value: TechNova
+
+  # -------------------------------------------------
+  # 2. Security Group para RDS
+  # -------------------------------------------------
+  SgRdsTechnova:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: sg-rds-technova
+      Description: Security Group para RDS TechNova - solo acceso desde sg-ec2-technova
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - Description: MySQL solo desde sg-ec2-technova
+          IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref SgEc2Technova
+      Tags:
+        - Key: Name
+          Value: sg-rds-technova
+        - Key: Proyecto
+          Value: TechNova
+
+# ──────────────────────────────────────────────
+# OUTPUTS
+# ──────────────────────────────────────────────
+Outputs:
+
+  SgEc2Id:
+    Description: ID de sg-ec2-technova
+    Value: !Ref SgEc2Technova
+    Export:
+      Name: sg-ec2-technova-id
+
+  SgRdsId:
+    Description: ID de sg-rds-technova (usar como input en Fase 3 - RDS)
+    Value: !Ref SgRdsTechnova
+    Export:
+      Name: sg-rds-technova-id

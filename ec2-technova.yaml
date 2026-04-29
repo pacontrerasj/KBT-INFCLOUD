@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  FASE 4 - Instancia EC2 para TechNova.
+  Crea la instancia EC2 con Amazon Linux, IP Elástica y User Data
+  para instalar Docker, Docker Compose, Telnet y MySQL client.
+
+# ──────────────────────────────────────────────
+# PARÁMETROS
+# ──────────────────────────────────────────────
+Parameters:
+
+  SubnetPublicaWebId:
+    Type: AWS::EC2::Subnet::Id
+    Description: ID de subnet-publica-web
+
+  SgEc2Id:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: ID de sg-ec2-technova
+
+# ──────────────────────────────────────────────
+# RECURSOS
+# ──────────────────────────────────────────────
+Resources:
+
+  # -------------------------------------------------
+  # 1. Instancia EC2
+  # -------------------------------------------------
+  Ec2Technova:
+    Type: AWS::EC2::Instance
+    Properties:
+      # AMI Amazon Linux 2023 (us-east-1) - Free tier eligible
+      ImageId: ami-0fff1b9a61dec8a5f
+      InstanceType: t3.micro
+
+      # Key pair vockey (debe existir previamente en tu cuenta)
+      KeyName: vockey
+
+      # Red
+      SubnetId: !Ref SubnetPublicaWebId
+      SecurityGroupIds:
+        - !Ref SgEc2Id
+      AssociatePublicIpAddress: true  # Auto-assign public IP: Enable
+
+      # Almacenamiento 20 GB gp3
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp3
+            DeleteOnTermination: true
+
+      # User Data - instala Docker, Docker Compose, Telnet y MySQL client
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          # Log de user data
+          exec > /var/log/user-data.log 2>&1
+          set -x
+
+          # Actualizar paquetes e instalar Docker (Amazon Linux 2 / 2023)
+          yum update -y
+          yum install -y docker
+
+          # Habilitar y arrancar Docker
+          systemctl enable docker
+          systemctl start docker
+          usermod -aG docker ec2-user
+          newgrp docker
+
+          # Habilitar Docker Compose
+          mkdir -p /usr/local/lib/docker/cli-plugins
+          curl -SL https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose
+          chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+          # Habilitar telnet
+          yum install telnet -y
+
+          # Habilitar mysql cliente
+          yum install mariadb105 -y
+
+      Tags:
+        - Key: Name
+          Value: ec2-technova
+        - Key: Proyecto
+          Value: TechNova
+
+  # -------------------------------------------------
+  # 2. IP Elástica
+  # -------------------------------------------------
+  ElasticIpTechnova:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: eip-technova
+        - Key: Proyecto
+          Value: TechNova
+
+  # -------------------------------------------------
+  # 3. Asociar IP Elástica a la instancia EC2
+  # -------------------------------------------------
+  ElasticIpAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref Ec2Technova
+      EIP: !Ref ElasticIpTechnova
+
+# ──────────────────────────────────────────────
+# OUTPUTS
+# ──────────────────────────────────────────────
+Outputs:
+
+  Ec2InstanceId:
+    Description: ID de la instancia EC2
+    Value: !Ref Ec2Technova
+    Export:
+      Name: ec2-technova-id
+
+  ElasticIp:
+    Description: IP Elástica asignada a la instancia EC2
+    Value: !Ref ElasticIpTechnova
+    Export:
+      Name: ec2-technova-eip
+
+  SSHCommand:
+    Description: Comando para conectarte por SSH a la instancia
+    Value: !Sub ssh -i vockey.pem ec2-user@${ElasticIpTechnova}

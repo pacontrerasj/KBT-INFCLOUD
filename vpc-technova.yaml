@@ -1,0 +1,172 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  FASE 1 - VPC Landing Zone para TechNova.
+  Crea VPC, 4 subnets (2 públicas + 2 privadas), Internet Gateway y Route Table pública.
+
+# ──────────────────────────────────────────────
+# RECURSOS
+# ──────────────────────────────────────────────
+Resources:
+
+  # -------------------------------------------------
+  # 1. VPC
+  # -------------------------------------------------
+  VpcTechnova:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/22
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: vpc-technova
+
+  # -------------------------------------------------
+  # 2. Subnets
+  # -------------------------------------------------
+
+  # Pública - Web (us-east-1a)
+  SubnetPublicaWeb:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcTechnova
+      CidrBlock: 10.0.0.0/24
+      AvailabilityZone: us-east-1a
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: subnet-publica-web
+
+  # Pública - App (us-east-1a)
+  SubnetPublicaApp:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcTechnova
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: us-east-1a
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: subnet-publica-app
+
+  # Privada - Datos 1 (us-east-1a)
+  SubnetPrivadaDatos1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcTechnova
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: us-east-1a
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: subnet-privada-datos-1
+
+  # Privada - Datos 2 (us-east-1b) ← AZ distinta, obligatoria para RDS Subnet Group
+  SubnetPrivadaDatos2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcTechnova
+      CidrBlock: 10.0.3.0/24
+      AvailabilityZone: us-east-1b
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: subnet-privada-datos-2
+
+  # -------------------------------------------------
+  # 3. Internet Gateway
+  # -------------------------------------------------
+  IgwTechnova:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: igw-technova
+
+  # Attach IGW a la VPC
+  AttachIgw:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VpcTechnova
+      InternetGatewayId: !Ref IgwTechnova
+
+  # -------------------------------------------------
+  # 4. Route Table pública
+  # -------------------------------------------------
+  RtPublicaTechnova:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcTechnova
+      Tags:
+        - Key: Name
+          Value: rt-publica-technova
+
+  # Ruta por defecto → IGW
+  RoutePublica:
+    Type: AWS::EC2::Route
+    DependsOn: AttachIgw
+    Properties:
+      RouteTableId: !Ref RtPublicaTechnova
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref IgwTechnova
+
+  # Asociar subnet-publica-web a la route table pública
+  AssocPublicaWeb:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetPublicaWeb
+      RouteTableId: !Ref RtPublicaTechnova
+
+  # Asociar subnet-publica-app a la route table pública
+  AssocPublicaApp:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetPublicaApp
+      RouteTableId: !Ref RtPublicaTechnova
+
+# ──────────────────────────────────────────────
+# OUTPUTS (usados como input en Fase 3)
+# ──────────────────────────────────────────────
+Outputs:
+
+  VpcId:
+    Description: ID de vpc-technova
+    Value: !Ref VpcTechnova
+    Export:
+      Name: vpc-technova-id
+
+  SubnetPublicaWebId:
+    Description: ID de subnet-publica-web
+    Value: !Ref SubnetPublicaWeb
+    Export:
+      Name: subnet-publica-web-id
+
+  SubnetPublicaAppId:
+    Description: ID de subnet-publica-app
+    Value: !Ref SubnetPublicaApp
+    Export:
+      Name: subnet-publica-app-id
+
+  SubnetPrivadaDatos1Id:
+    Description: ID de subnet-privada-datos-1 (us-east-1a)
+    Value: !Ref SubnetPrivadaDatos1
+    Export:
+      Name: subnet-privada-datos-1-id
+
+  SubnetPrivadaDatos2Id:
+    Description: ID de subnet-privada-datos-2 (us-east-1b)
+    Value: !Ref SubnetPrivadaDatos2
+    Export:
+      Name: subnet-privada-datos-2-id
+
+  IgwId:
+    Description: ID de igw-technova
+    Value: !Ref IgwTechnova
+    Export:
+      Name: igw-technova-id
+
+  RtPublicaId:
+    Description: ID de rt-publica-technova
+    Value: !Ref RtPublicaTechnova
+    Export:
+      Name: rt-publica-technova-id
